@@ -15,7 +15,7 @@ for i in range(5):
 
 
 # Video capture (OBS Virtual Camera)
-video_source = cv2.VideoCapture(0)  # Change to tested camera index
+video_source = cv2.VideoCapture(1)  # Change to tested camera index
 
 @app.route("/")
 def index():
