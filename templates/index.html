@@ -32,16 +32,31 @@
             min-width: 300px;
             text-align: center;
         }
+
+        /* Optional styling for the toggle button */
+        #toggleControlButton {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 6px;
+            border: none;
+            background-color: #337ab7;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Video Feed">
         <div id="keyDisplay">No key pressed yet</div>
+        
+        <!-- Toggle control button -->
+        <button id="toggleControlButton">Pause Control</button>
     </div>
 
     <script>
         var socket = io();
+        var controlEnabled = true;  // Local state to track button label
 
         document.addEventListener('keydown', function (event) {
             socket.emit('key_press', { key: event.key });
@@ -49,6 +64,20 @@
 
         socket.on('update_key', function (data) {
             document.getElementById('keyDisplay').textContent = 'Key pressed: "' + data.key + '"';
+        });
+
+        // Listen for status updates from the server
+        socket.on('control_status', function (data) {
+            alert(data.message);
+            controlEnabled = data.enabled; 
+            // update button label to reflect current state
+            document.getElementById('toggleControlButton').textContent =
+                controlEnabled ? "Pause Control" : "Resume Control";
+        });
+
+        // Handle the toggle button click
+        document.getElementById('toggleControlButton').addEventListener('click', function () {
+            socket.emit('toggle_control'); 
         });
 
         socket.on('connect', function () {
