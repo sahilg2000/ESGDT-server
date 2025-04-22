@@ -52,6 +52,7 @@
         
         <!-- Toggle control button -->
         <button id="toggleControlButton">Pause Control</button>
+        <button id="toggleViewButton">Toggle View Mode</button>
     </div>
 
     <script>
@@ -79,6 +80,12 @@
         document.getElementById('toggleControlButton').addEventListener('click', function () {
             socket.emit('toggle_control'); 
         });
+
+        // Handle the toggle mask/video view button click
+        document.getElementById('toggleViewButton').addEventListener('click', function () {
+            socket.emit('toggle_view');
+        });
+
 
         socket.on('connect', function () {
             console.log('Connected to server');

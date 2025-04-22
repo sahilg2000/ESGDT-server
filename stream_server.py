@@ -25,10 +25,12 @@ for i in range(5):
         print(f"Camera found at index {i}")
         cap.release()
 
-SEND_CONTROL = True
+SEND_CONTROL = False        # start without sending control commands
+VIEW_MASK = False           # start without mask view
+
 
 # Video capture (OBS Virtual Camera)
-video_source = cv2.VideoCapture(1) # Change to tested camera index
+video_source = cv2.VideoCapture(0) # Change to tested camera index
 
 @app.route("/")
 def index():
@@ -41,25 +43,16 @@ def generate_frames():
         if not success:
             break
 
-        # Convert to HLS for better control over brightness and color
-        hls = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
+        # Convert to grayscale and apply blur
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-        # Color threshold to isolate "white" lines
-        lower_white = np.array([0, 200, 0], dtype=np.uint8) 
-        upper_white = np.array([179, 255, 60], dtype=np.uint8)
-        mask_white = cv2.inRange(hls, lower_white, upper_white)
+        # Edge detection directly on blurred grayscale
+        edges = cv2.Canny(blurred, 30, 50)
 
-        # Isolate the white lines using morphological operations
-        kernel = np.ones((5, 5), np.uint8)
-        mask_white = cv2.morphologyEx(mask_white, cv2.MORPH_OPEN, kernel)
-        mask_white = cv2.morphologyEx(mask_white, cv2.MORPH_CLOSE, kernel)
-        
-        # Uncomment to visualize the mask and 
-        # change 'ret, buffer = cv2.imencode('.jpg', frame)' to 'ret, buffer = cv2.imencode('.png', mask_vis)'
-        # mask_vis = cv2.cvtColor(mask_white, cv2.COLOR_GRAY2BGR)
-        
-        # Edge detection on the color mask
-        edges = cv2.Canny(mask_white, 50, 150)
+        # Visualize edge mask
+        mask_vis = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+
 
         # Hough Transform to detect line segments
         lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50,
@@ -76,7 +69,9 @@ def generate_frames():
         CONTROL["steering"] = steering
 
         # Encode and yield the frame
-        ret, buffer = cv2.imencode('.jpg', frame)
+        output_frame = mask_vis if VIEW_MASK else frame
+        ret, buffer = cv2.imencode('.jpg', output_frame)
+
         if not ret:
             break
 
@@ -123,6 +118,13 @@ def compute_steering_from_lines(lines, shape):
 @app.route("/video_feed")
 def video_feed():
     return Response(generate_frames(), mimetype="multipart/x-mixed-replace; boundary=frame")
+
+@socketio.on('toggle_view')
+def handle_toggle_view():
+    global VIEW_MASK
+    VIEW_MASK = not VIEW_MASK
+    print(f"View mode: {'MASK' if VIEW_MASK else 'NORMAL'}")
+    
 
 @socketio.on('key_press')
 def handle_key_press(data):
