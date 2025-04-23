@@ -1,53 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Video Stream and Key Press Display</title>
+    <title>Video Stream Display</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f0f0f0;
-        }
-
-        .container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-
-        #videoFeed {
-            max-width: 800px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        #keyDisplay {
-            font-size: 24px;
-            padding: 20px;
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            min-width: 300px;
-            text-align: center;
-        }
-
-        /* Optional styling for the toggle button */
-        #toggleControlButton {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            border-radius: 6px;
-            border: none;
-            background-color: #337ab7;
-            color: #fff;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+    <div class="menu">
+        <div class="hamburger" onclick="toggleMenu()">&#9776;</div>
+        <div class="menu-content" id="menuContent">
+            <a href="https://github.com/sahilg2000/ESGDT#esgdt" id="helpSim" target="_blank">Simulation Help</a>
+            <a href="https://github.com/sahilg2000/ESGDT-server/#esgdt-server" id="helpServer" target="_blank">Server Help</a>
+        </div>
+    </div>
+    
     <div class="container">
+        <!-- Video feed from the server --> 
         <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Video Feed">
+        <canvas id="maskView" width="800" height="600" 
+        style="display:none; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></canvas>
+
+
+        <!-- Key display-->
         <div id="keyDisplay">No key pressed yet</div>
         
         <!-- Toggle control button -->
@@ -55,10 +29,12 @@
         <button id="toggleViewButton">Toggle View Mode</button>
     </div>
 
+    <!-- JavaScript Section-->
     <script>
         var socket = io();
         var controlEnabled = true;  // Local state to track button label
 
+        // Keydown event listener to capture key presses
         document.addEventListener('keydown', function (event) {
             socket.emit('key_press', { key: event.key });
         });
@@ -66,6 +42,7 @@
         socket.on('update_key', function (data) {
             document.getElementById('keyDisplay').textContent = 'Key pressed: "' + data.key + '"';
         });
+
 
         // Listen for status updates from the server
         socket.on('control_status', function (data) {
@@ -76,17 +53,19 @@
                 controlEnabled ? "Pause Control" : "Resume Control";
         });
 
+        
         // Handle the toggle button click
         document.getElementById('toggleControlButton').addEventListener('click', function () {
             socket.emit('toggle_control'); 
         });
 
+        
         // Handle the toggle mask/video view button click
         document.getElementById('toggleViewButton').addEventListener('click', function () {
             socket.emit('toggle_view');
         });
-
-
+        
+        //Socket connection events
         socket.on('connect', function () {
             console.log('Connected to server');
         });
@@ -94,6 +73,13 @@
         socket.on('disconnect', function () {
             console.log('Disconnected from server');
         });
+        
+        // Sandwich menu toggle
+        function toggleMenu() {
+            const menu = document.getElementById('menuContent');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+
     </script>
 </body>
 </html>
