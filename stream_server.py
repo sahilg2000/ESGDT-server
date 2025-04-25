@@ -30,7 +30,7 @@ VIEW_MASK = False           # start without mask view
 
 
 # Video capture (OBS Virtual Camera)
-video_source = cv2.VideoCapture(0) # Change to tested camera index
+video_source = cv2.VideoCapture(1) # Change to tested camera index
 
 @app.route("/")
 def index():
@@ -67,6 +67,45 @@ def generate_frames():
         # Compute a simple "steering" from the lines by finding the lane center at the bottom row of the image.
         steering = compute_steering_from_lines(lines, frame.shape)
         CONTROL["steering"] = steering
+
+        # FPS calculation using moving average
+        now = time.time()
+        if not hasattr(generate_frames, "last_time"):
+            generate_frames.last_time = now
+            fps = 0.0
+        else:
+            elapsed = now - generate_frames.last_time
+            fps = 1.0 / elapsed if elapsed > 0 else 0.0
+            generate_frames.last_time = now
+
+        # Count the number of lines detected
+        line_count = len(lines) if lines is not None else 0
+
+        # Mask coverage % = non-zero edge pixels in ROI
+        edge_pixels = np.count_nonzero(edges)
+        total_pixels = edges.shape[0] * edges.shape[1]
+        mask_coverage = 100.0 * edge_pixels / total_pixels
+
+        # Raw offset calculation for telemetry (even if not used in steering)
+        center_x = frame.shape[1] / 2.0
+        avg_x = sum([(x1 + x2) / 2.0 for [[x1, _, x2, _]] in lines]) / len(lines) if lines is not None else center_x
+        offset_px = center_x - avg_x
+
+        # Approximate steering angle using FOV assumption
+        fov_deg = 60.0  # assumed camera field of view in degrees
+        steering_angle_deg = CONTROL["steering"] * (fov_deg / 2)
+
+        # Emit telemetry data to frontend via Socket.IO
+        socketio.emit("telemetry", {
+            "offset_px": offset_px,
+            "steering": CONTROL["steering"],
+            "steering_angle": steering_angle_deg,
+            "throttle": CONTROL["throttle"],
+            "brake": CONTROL["brake"],
+            "fps": fps,
+            "line_count": line_count,
+            "mask_coverage": mask_coverage
+        })
 
         # Encode and yield the frame
         output_frame = mask_vis if VIEW_MASK else frame
@@ -126,23 +165,42 @@ def handle_toggle_view():
     print(f"View mode: {'MASK' if VIEW_MASK else 'NORMAL'}")
     
 
-@socketio.on('key_press')
-def handle_key_press(data):
-    """Handle key press events from the client"""
-    print(f"Key pressed: {data['key']}")
-    emit('update_key', {"key": data['key']}, broadcast=True)
-
-
 @socketio.on('toggle_control')
 def handle_toggle_control():
     """Toggle whether we're sending control commands to the simulation."""
     global SEND_CONTROL
-    SEND_CONTROL = not SEND_CONTROL
-    msg = f"Control is now {'ENABLED' if SEND_CONTROL else 'DISABLED'}"
-    print(msg)
-    # let all clients know the control status
-    emit('control_status', {"message": msg, "enabled": SEND_CONTROL}, broadcast=True)
+
+    if SEND_CONTROL:
+        print("[CONTROL] Control is being paused... applying brake first.")
+
+        # Start a thread to apply brake for 3 seconds before fully pausing
+        def apply_brake_then_pause():
+            CONTROL["throttle"] = 0.0
+            CONTROL["brake"] = 1.0
+            time.sleep(1.5)  
+            global SEND_CONTROL
+            SEND_CONTROL = False
+            CONTROL["brake"] = 0.0  # reset brake so next start is clean
+            print("[CONTROL] Control is now fully paused.")
+
+        threading.Thread(target=apply_brake_then_pause, daemon=True).start()
+
+        emit('control_status', {
+            "message": "Control pausing: applying brakes",
+            "enabled": False
+        }, broadcast=True)
     
+    else:
+        # Resume control immediately
+        SEND_CONTROL = True
+        CONTROL["throttle"] = 0.1
+        CONTROL["brake"] = 0.0
+        print("[CONTROL] Control resumed.")
+        emit('control_status', {
+            "message": "Control resumed.",
+            "enabled": True
+        }, broadcast=True)
+
 async def ws_sender_loop():
     """Asynchronously connect to the simulation's WebSocket and send throttle/brake/steering."""
     uri = "ws://127.0.0.1:8080"

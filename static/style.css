@@ -1,102 +1,206 @@
 body {
     font-family: Arial, sans-serif;
     margin: 0;
-    padding: 20px;
-    background-color: #eaeaea;
+    padding: 0;
+    background-color: #121212;
+    color: #f0f0f0;
+    position: relative;
 }
 
 .container {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 20px;
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+    margin-top: 60px;
 }
 
 
 /* styling for the video feed and mask view */
 #videoFeed, #maskView {
-    max-width: 630px;
-    border-radius: 20px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-/* styling for the Key press display */
-#keyDisplay {
-    font-size: 20px;
-    padding: 10px 16px;
-    background-color: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    min-width: 300px;
-    text-align: center;
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    border: 1px solid #333;
 }
 
 /* styling for the toggle buttons */
 #toggleControlButton, #toggleViewButton {
-    padding: 6px 12px;
-    font-size: 18px;
+    padding: 10px 20px;
+    font-size: 16px;
     cursor: pointer;
     border-radius: 6px;
     border: none;
-    background-color: #0057a3;
+    background-color: #0d6efd;
     color: #fff;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.3s;
+    font-weight: bold; /* Making the button text bold */
 }
 
-#toggleControlButton:hover,
-#toggleViewButton:hover {
-    background-color:rgb(0, 31, 63);
+    #toggleControlButton:hover, #toggleViewButton:hover {
+        background-color: #0b5ed7;
+    }
+
+h1 {
+    color: #0d6efd;
+    text-align: center;
+    margin-bottom: 20px;
 }
 
 
-/* styling for the sandwich menu */
-.menu {
-    position: absolute;
-    top: 10px;
-    left: 10px;
+/* styling for the help menu */
+.help-toggle {
+    position: fixed;
+    top: 20px;
+    left: 20px;
     z-index: 1000;
-    display: flex;
-    flex-direction: column;
-}
-
-.hamburger {
-    font-size: 24px;
-    background: #0057a3;
+    background-color: #0d6efd;
     color: white;
-    padding: 6px 10px;
+    border: none;
     border-radius: 4px;
+    padding: 8px 12px;
     cursor: pointer;
-    display: inline-block;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.menu-content {
-    display: none;
-    position: absolute;
-    top: 60px;
+    .help-toggle .icon {
+        width: 20px;
+        height: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+.help-menu {
+    position: fixed;
+    top: 0;
     left: 0;
-    background: #fff;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    padding: 0;
-    min-width: 140px;
+    width: 300px;
+    height: 100%;
+    background-color: #1a1a1a;
+    z-index: 999;
+    padding: 60px 20px 20px;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.5);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
 }
 
-.menu-content a {
-    display: block;
-    padding: 8px 14px;
-    font-size: 14px;
+    .help-menu.active {
+        transform: translateX(0);
+    }
+
+.help-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    color: #f0f0f0;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.help-item {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #333;
+}
+
+.help-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #0d6efd;
+    margin-bottom: 10px;
+}
+
+.help-link {
+    display: inline-block;
+    color: #f0f0f0;
+    background-color: #2d2d2d;
     text-decoration: none;
-    color: #333;
-    white-space: nowrap;
-    line-height: 1.2;
-    border-bottom: 1px solid #eee;
+    padding: 8px 16px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
 }
 
-.menu-content a:last-child {
-    border-bottom: none;
+    .help-link:hover {
+        background-color: #3d3d3d;
+    }
+
+#telemetryBox {
+    background: #0d6efd;
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-left: 20px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    font-size: 16px;
+    color: #fff;
+    min-width: 280px;
+    line-height: 1.4;
+}
+#telemetryBox h3 {
+    margin-top: 0;
+    font-size: 18px;
+    margin-bottom: 10px;
+}
+#telemetryBox ul {
+    list-style: none;
+    padding-left: 0;
+}
+#telemetryBox li {
+    margin-bottom: 6px;
 }
 
-.menu-content a:hover {
-    background-color: #f0f0f0;
+.tooltip-icon {
+    display: inline-block;
+    position: relative;
+    cursor: help;
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    vertical-align: middle;
+    background: url("/static/info.png") no-repeat center center;
+    background-size: contain;
+}
+
+.tooltip-icon:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+}
+
+.tooltip-text {
+    visibility: hidden;
+    opacity: 0;
+    width: max-content;
+    max-width: 220px;
+    background-color: #333;
+    color: #fff;
+    text-align: left;
+    border-radius: 6px;
+    padding: 6px 10px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: opacity 0.3s ease;
+    font-size: 12px;
+    white-space: normal;
+}
+
+.tooltip-text::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
 }
