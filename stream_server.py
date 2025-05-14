@@ -11,6 +11,7 @@ from flask_socketio import SocketIO, emit
 app = Flask(__name__)
 socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
 
+
 # Global dictionary storing the current control values
 CONTROL = {
     "throttle": 0.1,   # Slow forward by default 
@@ -18,15 +19,14 @@ CONTROL = {
     "steering": 0.0
 }
 
-
 for i in range(5):
     cap = cv2.VideoCapture(i)
     if cap.isOpened():
         print(f"Camera found at index {i}")
         cap.release()
 
-SEND_CONTROL = False        # start without sending control commands
-VIEW_MASK = False           # start without mask view
+SEND_CONTROL = False          # start without sending control commands
+VIEW_MASK    = False          # start in normal view
 
 
 # Video capture (OBS Virtual Camera)
@@ -36,6 +36,30 @@ video_source = cv2.VideoCapture(1) # Change to tested camera index
 def index():
     return render_template("index.html")
 
+#  classify a single Hough segment by voting on the three masks
+def classify_line_with_masks(x1, y1, x2, y2, masks):
+    """
+    Decide whether a line segment is cyan, magenta or white by counting
+    how many pixels of that segment fall inside each binary mask.
+    """
+    h, w = next(iter(masks.values())).shape
+    tmp = np.zeros((h, w), dtype=np.uint8)
+    cv2.line(tmp, (x1, y1), (x2, y2), 255, 3)
+
+    votes = {name: cv2.countNonZero(cv2.bitwise_and(tmp, m))
+             for name, m in masks.items()}
+
+    # choose the mask with most overlap
+    label = max(votes, key=votes.get)
+
+    outline_bgr = {                 # use contrasting colours
+        "cyan":    (  0,165,255),   # orange
+        "magenta": (  0,255,  0),   # lime-green
+        "white":   (255,  0,  0),   # blue
+    }[label]
+
+    return label, outline_bgr
+
 def generate_frames():
 
     while True:
@@ -43,26 +67,45 @@ def generate_frames():
         if not success:
             break
 
-        # Convert to grayscale and apply blur
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        # Convert to HLS for better control over brightness and color
+        frame_hls = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
 
-        # Edge detection directly on blurred grayscale
-        edges = cv2.Canny(blurred, 30, 50)
+        # Color threshold to isolate color lines
+        mask_white = cv2.inRange(frame_hls,
+                                 np.array([  0,200,   0], dtype=np.uint8),
+                                 np.array([179,255,  70], dtype=np.uint8))
 
-        # Visualize edge mask
-        mask_vis = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+        mask_cyan = cv2.inRange(frame_hls,
+                                np.array([ 80, 50, 100], dtype=np.uint8),
+                                np.array([105,255,255], dtype=np.uint8))
 
+        mask_mag = cv2.inRange(frame_hls,
+                               np.array([135, 50, 100], dtype=np.uint8),
+                               np.array([170,255,255], dtype=np.uint8))
+
+        # Morphological clean-up on every mask
+        kernel = np.ones((5, 5), np.uint8)
+        for m in (mask_white, mask_cyan, mask_mag):
+            m[:] = cv2.morphologyEx(m, cv2.MORPH_OPEN,  kernel)
+            m[:] = cv2.morphologyEx(m, cv2.MORPH_CLOSE, kernel)
+
+        # Edge detection on the combined colour mask
+        mask_all = cv2.bitwise_or(mask_white,
+                                  cv2.bitwise_or(mask_cyan, mask_mag))
+        edges = cv2.Canny(mask_all, 50, 150)
 
         # Hough Transform to detect line segments
-        lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50,
-                                minLineLength=50, maxLineGap=150)
+        lines = cv2.HoughLinesP(edges, 1, np.pi / 180,
+                                threshold=50,
+                                minLineLength=50,
+                                maxLineGap=150)
 
-        # For debugging: draw lines in green
+         # Determine the colour of every line segment by mask voting
         if lines is not None:
-            for line in lines:
-                x1, y1, x2, y2 = line[0]
-                cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
+            masks = {"cyan": mask_cyan, "magenta": mask_mag, "white": mask_white}
+            for (x1, y1, x2, y2) in lines[:, 0]:
+                _, outline = classify_line_with_masks(x1, y1, x2, y2, masks)
+                cv2.line(frame, (x1, y1), (x2, y2), outline, 3)
 
         # Compute a simple "steering" from the lines by finding the lane center at the bottom row of the image.
         steering = compute_steering_from_lines(lines, frame.shape)
@@ -74,8 +117,7 @@ def generate_frames():
             generate_frames.last_time = now
             fps = 0.0
         else:
-            elapsed = now - generate_frames.last_time
-            fps = 1.0 / elapsed if elapsed > 0 else 0.0
+            fps = 1.0 / max(1e-6, now - generate_frames.last_time)
             generate_frames.last_time = now
 
         # Count the number of lines detected
@@ -108,12 +150,11 @@ def generate_frames():
         })
 
         # Encode and yield the frame
-        output_frame = mask_vis if VIEW_MASK else frame
+        output_frame = (cv2.cvtColor(mask_all, cv2.COLOR_GRAY2BGR)
+                        if VIEW_MASK else frame)
         ret, buffer = cv2.imencode('.jpg', output_frame)
-
         if not ret:
             break
-
         yield (b"--frame\r\n"
                b"Content-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
 
