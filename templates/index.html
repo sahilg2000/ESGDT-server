@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html>
 <head>
     <title>Video Stream Display</title>
@@ -8,13 +8,13 @@
 </head>
 <body>
 
-    <!-- Help toggle button -->
+    <!-- Help toggle button
     <button class="help-toggle" id="helpToggle">
         <span class="icon"><i class="fas fa-bars"></i></span>
         Help & Resources
     </button>
 
-    <!-- Help menu panel -->
+    <!-- Help menu panel 
     <div class="help-menu" id="helpMenu">
         <button class="help-close" id="helpClose"><i class="fas fa-times"></i></button>
 
@@ -34,15 +34,15 @@
     </div>
 
     <div class="container">
-        <!-- Video Stream -->
+        <!-- Video Stream 
         <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Video Feed">
         <canvas id="maskView" width="800" height="600" style="display:none;"></canvas>
 
-        <!-- Control Buttons -->
+        <!-- Control Buttons 
         <button id="toggleControlButton">Pause Control</button>
         <button id="toggleViewButton">Toggle View Mode</button>
 
-        <!-- Telemetry Info -->
+        <!-- Telemetry Info 
         <div id="telemetryBox">
             <h3>Decision system Info</h3>
             <ul>
@@ -58,7 +58,7 @@
         </div>
     </div>
 
-    <!-- JavaScript Logic -->
+    <!-- JavaScript Logic 
     <script>
         var socket = io();
         var controlEnabled = true;
@@ -97,6 +97,346 @@
             document.getElementById('helpMenu').classList.add('active');
         });
         document.getElementById('helpClose').addEventListener('click', () => {
+            document.getElementById('helpMenu').classList.remove('active');
+        });
+    </script>
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Video Stream Display</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #10141f;
+        }
+
+        .main-container {
+            position: relative;
+            padding: 20px;
+            width: 100%;
+        }
+
+        .content-container {
+            display: flex;
+            max-width: 1200px;
+            margin: 0 auto;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .video-container {
+            position: relative;
+            margin: 0 auto;
+            width: 60%;
+        }
+
+        #videoFeed {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #maskView {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: #3fb8af;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+
+            button:hover {
+                background-color: #2980b9;
+            }
+
+        #telemetryBox {
+            background-color: #3fb8af;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 250px;
+            margin-left: auto;
+        }
+
+            #telemetryBox h3 {
+                margin-top: 0;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+                padding-bottom: 10px;
+            }
+
+            #telemetryBox ul {
+                list-style-type: none;
+                padding: 0;
+                margin: 0;
+            }
+
+            #telemetryBox li {
+                margin-bottom: 10px;
+                position: relative;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            #telemetryBox strong {
+                margin-right: 10px;
+            }
+
+        .tooltip-icon {
+            position: relative;
+            display: inline-block;
+            margin-right: 5px;
+            width: 18px;
+            height: 18px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            text-align: center;
+            line-height: 18px;
+            cursor: help;
+        }
+
+            .tooltip-icon:after {
+                content: "i";
+                font-style: italic;
+                font-size: 12px;
+            }
+
+        .tooltip-text {
+            visibility: hidden;
+            width: 200px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            left: 125%;
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-size: 12px;
+            pointer-events: none;
+        }
+
+        .tooltip-icon:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Help menu toggle button */
+        .help-toggle {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        /* Help menu initially hidden */
+        .help-menu {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 350px;
+            height: 100%;
+            background-color: #3fb8af;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            z-index: 100;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+
+            /* Show help menu when active */
+            .help-menu.active {
+                display: block;
+                transform: translateX(0);
+            }
+
+        .help-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            color: #333;
+            padding: 5px;
+        }
+
+        .help-item {
+            margin-bottom: 30px;
+            margin-top: 40px;
+        }
+
+        .help-title {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .help-link {
+            display: block;
+            padding: 10px;
+            background-color: #f8f8f8;
+            color: #333;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+
+            .help-link:hover {
+                background-color: #eaeaea;
+            }
+    </style>
+</head>
+<body>
+
+    <!-- Help toggle button -->
+    <button class="help-toggle" id="helpToggle">
+        <span class="icon"><i class="fas fa-bars"></i></span>
+        Help & Resources
+    </button>
+
+    <!-- Help menu panel -->
+    <div class="help-menu" id="helpMenu">
+        <button class="help-close" id="helpClose"><i class="fas fa-times"></i></button>
+
+        <div class="help-item">
+            <div class="help-title">Simulation Help</div>
+            <a href="https://github.com/sahilg2000/ESGDT.git" class="help-link" target="_blank">
+                <i class="fas fa-external-link-alt"></i> View ESGDT Resources
+            </a>
+        </div>
+
+        <div class="help-item">
+            <div class="help-title">Server Help</div>
+            <a href="https://github.com/sahilg2000/ESGDT-server.git" class="help-link" target="_blank">
+                <i class="fas fa-external-link-alt"></i> View Server Resources
+            </a>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="content-container">
+            <!-- Left spacer -->
+            <div style="width: 20%;"></div>
+
+            <!-- Center video -->
+            <div class="video-container">
+                <img id="videoFeed" src="{{ url_for('video_feed') }}" alt="Video Feed">
+                <canvas id="maskView" width="800" height="600" style="display:none;"></canvas>
+
+                <div class="controls">
+                    <button id="toggleControlButton">Toggle Control</button>
+                    <button id="toggleViewButton">Toggle View Mode</button>
+                </div>
+            </div>
+
+            <!-- Right telemetry panel -->
+            <div id="telemetryBox">
+                <h3>Decision system Info</h3>
+                <ul>
+                    <li>
+                        <div><span class="tooltip-icon"><span class="tooltip-text">The pixel distance from the center of the frame to the average detected line center.</span></span><strong>Steering Offset (px)</strong>:</div>
+                        <span id="offsetPx">0</span>
+                    </li>
+                    <li>
+                        <div><span class="tooltip-icon"><span class="tooltip-text">Steering value from -1 (left) to 1 (right). Useful for tuning control behavior.</span></span><strong>Steering [-1,1]</strong>:</div>
+                        <span id="steeringNorm">0.00</span>
+                    </li>
+                    <li>
+                        <div><span class="tooltip-icon"><span class="tooltip-text">The actual turn angle based on the camera field of view.</span></span><strong>Steering Angle (°)</strong>:</div>
+                        <span id="steeringAngle">0.00</span>
+                    </li>
+                    <li>
+                        <div><span class="tooltip-icon"><span class="tooltip-text">Current throttle value — determines forward speed.</span></span><strong>Throttle</strong>:</div>
+                        <span id="throttleVal">0.00</span>
+                    </li>
+                    <li>
+                        <div><span class="tooltip-icon"><span class="tooltip-text">Current brake intensity — 1.0 means full brake.</span></span><strong>Brake</strong>:</div>
+                        <span id="brakeVal">0.00</span>
+                    </li>
+                    <li>
+                        <div><span class="tooltip-icon"><span class="tooltip-text">Frame rate of the system — helpful for detecting lag or performance issues.</span></span><strong>FPS</strong>:</div>
+                        <span id="fpsVal">0.0</span>
+                    </li>
+                    <li>
+                        <div><span class="tooltip-icon"><span class="tooltip-text">Total number of line segments detected by HoughLinesP in the region of interest.</span></span><strong>Lines Detected</strong>:</div>
+                        <span id="lineCount">0</span>
+                    </li>
+                    <li>
+                        <div><span class="tooltip-icon"><span class="tooltip-text">The percentage of pixels in the region of interest that became edges (Canny mask).</span></span><strong>Mask Coverage (%)</strong>:</div>
+                        <span id="maskCoverage">0.00</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var socket = io();
+        var controlEnabled = true;
+
+        socket.on('control_status', function (data) {
+            alert(data.message);
+            controlEnabled = data.enabled;
+            document.getElementById('toggleControlButton').textContent =
+                controlEnabled ? "Pause Control" : "Resume Control";
+        });
+
+        document.getElementById('toggleControlButton').addEventListener('click', function () {
+            socket.emit('toggle_control');
+        });
+
+        document.getElementById('toggleViewButton').addEventListener('click', function () {
+            socket.emit('toggle_view');
+        });
+
+        socket.on('telemetry', function (data) {
+            document.getElementById('offsetPx').textContent = data.offset_px.toFixed(2);
+            document.getElementById('steeringNorm').textContent = data.steering.toFixed(2);
+            document.getElementById('steeringAngle').textContent = data.steering_angle.toFixed(2);
+            document.getElementById('throttleVal').textContent = data.throttle.toFixed(2);
+            document.getElementById('brakeVal').textContent = data.brake.toFixed(2);
+            document.getElementById('fpsVal').textContent = data.fps.toFixed(1);
+            document.getElementById('lineCount').textContent = data.line_count;
+            document.getElementById('maskCoverage').textContent = data.mask_coverage.toFixed(2);
+        });
+
+        socket.on('connect', () => console.log("Connected to server"));
+        socket.on('disconnect', () => console.log("Disconnected from server"));
+
+        document.getElementById('helpToggle').addEventListener('click', function () {
+            document.getElementById('helpMenu').classList.add('active');
+        });
+
+        document.getElementById('helpClose').addEventListener('click', function () {
             document.getElementById('helpMenu').classList.remove('active');
         });
     </script>

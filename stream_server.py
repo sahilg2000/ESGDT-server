@@ -14,7 +14,7 @@ socketio = SocketIO(app, async_mode="threading", cors_allowed_origins="*")
 
 # Global dictionary storing the current control values
 CONTROL = {
-    "throttle": 0.1,   # Slow forward by default 
+    "throttle": 0.0,   # Slow forward by default 
     "brake": 0.0,
     "steering": 0.0
 }
@@ -100,13 +100,27 @@ def generate_frames():
                                 minLineLength=50,
                                 maxLineGap=150)
 
+        detected_colours = set()
+
          # Determine the colour of every line segment by mask voting
         if lines is not None:
             masks = {"cyan": mask_cyan, "magenta": mask_mag, "white": mask_white}
             for (x1, y1, x2, y2) in lines[:, 0]:
-                _, outline = classify_line_with_masks(x1, y1, x2, y2, masks)
+                label, outline = classify_line_with_masks(x1, y1, x2, y2, masks)
+                detected_colours.add(label)
                 cv2.line(frame, (x1, y1), (x2, y2), outline, 3)
 
+
+        if "magenta" in detected_colours:
+            CONTROL["throttle"] = 0.0   
+            CONTROL["brake"]    =   0.2 # slow down
+        elif "cyan" in detected_colours:
+            CONTROL["throttle"] = 0.1   # Constant speed
+            CONTROL["brake"]    = 0.15   
+        else:                           
+            CONTROL["throttle"] = 0.1   # Accelerate
+            CONTROL["brake"]    = 0.0
+            
         # Compute a simple "steering" from the lines by finding the lane center at the bottom row of the image.
         steering = compute_steering_from_lines(lines, frame.shape)
         CONTROL["steering"] = steering
