@@ -27,7 +27,7 @@ for i in range(5):
 
 SEND_CONTROL = False          # start without sending control commands
 VIEW_MASK    = False          # start in normal view
-
+BRAKE_OVERRIDE_UNTIL = 0.0  
 
 # Video capture (OBS Virtual Camera)
 video_source = cv2.VideoCapture(1) # Change to tested camera index
@@ -67,6 +67,8 @@ def generate_frames():
         if not success:
             break
 
+        now = time.time()
+        
         # Convert to HLS for better control over brightness and color
         frame_hls = cv2.cvtColor(frame, cv2.COLOR_BGR2HLS)
 
@@ -110,16 +112,18 @@ def generate_frames():
                 detected_colours.add(label)
                 cv2.line(frame, (x1, y1), (x2, y2), outline, 3)
 
-
-        if "magenta" in detected_colours:
-            CONTROL["throttle"] = 0.0   
-            CONTROL["brake"]    =   0.2 # slow down
-        elif "cyan" in detected_colours:
-            CONTROL["throttle"] = 0.1   # Constant speed
-            CONTROL["brake"]    = 0.15   
-        else:                           
-            CONTROL["throttle"] = 0.1   # Accelerate
-            CONTROL["brake"]    = 0.0
+        if now < BRAKE_OVERRIDE_UNTIL:
+            CONTROL.update(throttle=0.0, brake=1.0)
+        else:
+            if "magenta" in detected_colours:
+                CONTROL["throttle"] = 0.0   
+                CONTROL["brake"]    =   0.2 # slow down
+            elif "cyan" in detected_colours:
+                CONTROL["throttle"] = 0.15   # Constant speed
+                CONTROL["brake"]    = 0.15   
+            else:                           
+                CONTROL["throttle"] = 0.15   # Accelerate
+                CONTROL["brake"]    = 0.0
             
         # Compute a simple "steering" from the lines by finding the lane center at the bottom row of the image.
         steering = compute_steering_from_lines(lines, frame.shape)
@@ -222,34 +226,20 @@ def handle_toggle_view():
 
 @socketio.on('toggle_control')
 def handle_toggle_control():
-    """Toggle whether we're sending control commands to the simulation."""
-    global SEND_CONTROL
+    global SEND_CONTROL, BRAKE_OVERRIDE_UNTIL
 
-    if SEND_CONTROL:
-        print("[CONTROL] Control is being paused... applying brake first.")
-
-        # Start a thread to apply brake for 3 seconds before fully pausing
-        def apply_brake_then_pause():
-            CONTROL["throttle"] = 0.0
-            CONTROL["brake"] = 1.0
-            time.sleep(1.5)  
-            global SEND_CONTROL
-            SEND_CONTROL = False
-            CONTROL["brake"] = 0.0  # reset brake so next start is clean
-            print("[CONTROL] Control is now fully paused.")
-
-        threading.Thread(target=apply_brake_then_pause, daemon=True).start()
-
+    if SEND_CONTROL:                          # pause external control
+        BRAKE_OVERRIDE_UNTIL = time.time() + 1.5   # 1.5s hard-brake window
+        SEND_CONTROL = False                       
         emit('control_status', {
             "message": "Control pausing: applying brakes",
             "enabled": False
         }, broadcast=True)
-    
-    else:
-        # Resume control immediately
+
+    else:                                      # resume external control
         SEND_CONTROL = True
-        CONTROL["throttle"] = 0.1
-        CONTROL["brake"] = 0.0
+        BRAKE_OVERRIDE_UNTIL = 0.0             # reset brake override
+        CONTROL.update(throttle=0.1, brake=0.0)
         print("[CONTROL] Control resumed.")
         emit('control_status', {
             "message": "Control resumed.",
@@ -267,7 +257,7 @@ async def ws_sender_loop():
                 print("Connected to sim's WebSocket!")
                 while True:
                     # if SEND_CONTROL is True, send the control commands
-                    if SEND_CONTROL:
+                    if SEND_CONTROL or time.time() < BRAKE_OVERRIDE_UNTIL:
                         t = CONTROL["throttle"]
                         b = CONTROL["brake"]
                         s = CONTROL["steering"]
